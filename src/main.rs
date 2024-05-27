@@ -52,9 +52,9 @@ enum PowerDraw {
 impl PowerDraw {
     fn value(&self) -> u8 {
         match self {
-            PowerDraw::Camera => 1,
-            PowerDraw::Lights => 2,
-            PowerDraw::Doors => 3,
+            PowerDraw::Camera => 2,
+            PowerDraw::Lights => 4,
+            PowerDraw::Doors => 7,
         }
     }
 }
@@ -101,8 +101,8 @@ impl Battery {
     fn update_power(&mut self) {
         let mut rng = rand::thread_rng();
         for (i, &draw) in self.power_draw.iter().enumerate() {
-            let random_tick: u8 = rng.gen_range(1..20);
-            if draw as u8 == random_tick {
+            let random_tick: u8 = rng.gen_range(1..10);
+            if draw as u8 <= random_tick {
                 if self.power > 0 {
                     self.power -= draw.value();
                 } else {
@@ -136,30 +136,33 @@ impl Animatronic {
         let random_index = rng.gen_range(0..20);
         
         if random_index <= self.difficulty {
-            let adjacent_rooms = map.find_adjacent_room(&self.location);
-            let locations = adjacent_rooms.iter().map(|(x, y)| map.grid[*x as usize][*y as usize]);
+            let adjacent_rooms = map.find_adjacent_room(self.location);
             let mut closest: Locations = Locations::ShowStage;
 
-            for (i, loc) in locations.enumerate() {
-                match loc {
-                    Some(l) => {
-                        let dist = map.distance_from_office_attack(&loc.unwrap());
-                        let closest_dist = map.distance_from_office_attack(&closest);
-                        if dist < closest_dist {
-                            if loc == Some(Locations::SecurityOfficeStaticL) && !map.left_door_closed {
-                                closest = loc.unwrap();
-                            } else if loc == Some(Locations::SecurityOfficeStaticR) && !map.right_door_closed {
-                                closest = loc.unwrap();
-                            } else {
-                                closest = loc.unwrap();
-                            }
-                        }
-                    }
-                    None => {}
-                }
-            }
+            let mut random_index = rng.gen_range(0..adjacent_rooms.len());
+            self.location = adjacent_rooms[random_index];
 
-            self.location = closest;
+            // pathfinding is stupid random numbers are good!
+            // for (i, loc) in locations.enumerate() {
+            //     match loc {
+            //         Some(l) => {
+            //             let dist = map.distance_from_office_attack(&loc.unwrap());
+            //             let closest_dist = map.distance_from_office_attack(&closest);
+            //             if dist < closest_dist {
+            //                 if loc == Some(Locations::SecurityOfficeStaticL) && !map.left_door_closed {
+            //                     closest = loc.unwrap();
+            //                 } else if loc == Some(Locations::SecurityOfficeStaticR) && !map.right_door_closed {
+            //                     closest = loc.unwrap();
+            //                 } else {
+            //                     closest = loc.unwrap();
+            //                 }
+            //             }
+            //         }
+            //         None => {}
+            //     }
+            // }
+
+            // self.location = closest;
         }
     }
 }
@@ -185,10 +188,8 @@ impl Map {
         }
     }
 
-    fn find_adjacent_room(&self, location: &Locations) -> Vec<(u8, u8)> {
-        let mut ret: Vec<(u8, u8)> = Vec::new();
-
-        let (x, y) = self.find_location(location);
+    fn find_adjacent_room(&self, location: Locations) -> Vec<Locations> {
+        let mut ret: Vec<Locations> = Vec::new();
 
         // lol made by a map that i drew up
         // why do things automatically when you can hard code them!
@@ -204,52 +205,52 @@ impl Map {
 
         match location {
             Locations::HallwayL => {
-                ret.push(self.find_location(&Locations::Restrooms));
-                ret.push(self.find_location(&Locations::SecurityOfficeStaticL));
+                ret.push(Locations::Restrooms);
+                ret.push(Locations::SecurityOfficeStaticL);
             },
             Locations::HallwayR => {
-                ret.push(self.find_location(&Locations::Kitchen));
-                ret.push(self.find_location(&Locations::SecurityOfficeStaticR));
+                ret.push(Locations::Kitchen);
+                ret.push(Locations::SecurityOfficeStaticR);
             },
             Locations::ShowStage => {
-                ret.push(self.find_location(&Locations::DiningAreaC));
+                ret.push(Locations::DiningAreaC);
             },
             Locations::DiningAreaL => {
-                ret.push(self.find_location(&Locations::Arcade));
-                ret.push(self.find_location(&Locations::DiningAreaC));
+                ret.push(Locations::Arcade);
+                ret.push(Locations::DiningAreaC);
             },
             Locations::DiningAreaC => {
-                ret.push(self.find_location(&Locations::DiningAreaL));
-                ret.push(self.find_location(&Locations::DiningAreaR));
-                ret.push(self.find_location(&Locations::ShowStage));
-                ret.push(self.find_location(&Locations::Restrooms));
+                ret.push(Locations::DiningAreaL);
+                ret.push(Locations::DiningAreaR);
+                ret.push(Locations::ShowStage);
+                ret.push(Locations::Restrooms);
             },
             Locations::DiningAreaR => {
-                ret.push(self.find_location(&Locations::DiningAreaC));
-                ret.push(self.find_location(&Locations::Kitchen));
+                ret.push(Locations::DiningAreaC);
+                ret.push(Locations::Kitchen);
             },
             Locations::Restrooms => {
-                ret.push(self.find_location(&Locations::DiningAreaC));
-                ret.push(self.find_location(&Locations::HallwayL));
-                ret.push(self.find_location(&Locations::Arcade));
+                ret.push(Locations::DiningAreaC);
+                ret.push(Locations::HallwayL);
+                ret.push(Locations::Arcade);
             },
             Locations::Kitchen => {
-                ret.push(self.find_location(&Locations::DiningAreaR));
-                ret.push(self.find_location(&Locations::HallwayR));
+                ret.push(Locations::DiningAreaR);
+                ret.push(Locations::HallwayR);
             },
             Locations::Arcade => {
-                ret.push(self.find_location(&Locations::Restrooms));
-                ret.push(self.find_location(&Locations::DiningAreaL));
-                ret.push(self.find_location(&Locations::HallwayL));
+                ret.push(Locations::Restrooms);
+                ret.push(Locations::DiningAreaL);
+                ret.push(Locations::HallwayL);
             },
             Locations::SecurityOfficeStaticR => { 
-                ret.push(self.find_location(&Locations::SecurityOfficeAttack)); 
+                ret.push(Locations::SecurityOfficeAttack); 
             },
             Locations::SecurityOfficeStaticL => { 
-                ret.push(self.find_location(&Locations::SecurityOfficeAttack)); 
+                ret.push(Locations::SecurityOfficeAttack); 
             },
             Locations::SecurityOfficeAttack => { 
-                ret.push(self.find_location(location)); 
+                ret.push(location); 
             },
         }
 
@@ -413,6 +414,7 @@ fn main() {
     let mut time: u32 = START_TIME;
 
     let mut battery = Battery::new();
+    battery.add_power_draw(PowerDraw::Camera);
 
     let mut animatronics: Vec<Animatronic> = Vec::new();
 
@@ -432,10 +434,11 @@ fn main() {
 
     let map = Map::new();
 
+    let mut death: bool = false;
 
     loop {
         let (hours, minutes) = display_time(time);
-        println!("Time: {:02}:{:02}", hours, minutes);
+        println!("Time: {:02}:{:02}\nBattery: {}%", hours, minutes, battery.power);
 
         battery.update_power();
 
@@ -451,12 +454,21 @@ fn main() {
                     states.insert(new_loc, (state.0, Tells::Visual));
                 }
             }
+
+            if new_loc == Locations::SecurityOfficeAttack {
+                death = true;
+            }
         }
 
         map.display_map(&states);
 
         if battery.power == 0 {
             println!("You ran out of power! Game over!");
+            break;
+        }
+
+        if death {
+            println!("You were attacked by an animatronic! Game over!");
             break;
         }
 
