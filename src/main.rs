@@ -18,12 +18,14 @@ enum Locations {
     HallwayR,
 }
 
+#[derive(PartialEq, Hash, Clone, Copy, Eq)]
 enum Tells {
     Laughing,
     Noise,
     Footsteps,
     Static,
     Visual,
+    Breathing,
 }
 
 impl Tells {
@@ -34,6 +36,7 @@ impl Tells {
             Tells::Footsteps => "F",
             Tells::Static => "S",
             Tells::Visual => "V",
+            Tells::Breathing => "B",
         }
     }
 }
@@ -208,47 +211,71 @@ impl Animatronic {
         let random_index = rng.gen_range(0..20);
 
         if random_index <= self.difficulty {
-            let adjacent_rooms = adjacent_loc;
-            // let mut closest: Locations = Locations::ShowStage;
-
-            let random_index = rng.gen_range(0..adjacent_rooms.len());
-
-            // Check to see if the animatronic is trying to move to the security office
-            // if it is, check if the door is closed
-            // if it is, don't move there
-            if adjacent_rooms[random_index] == Locations::SecurityOfficeStaticR && right_door_closed
             {
-                return;
+                // move the animatronic
+                let adjacent_rooms = adjacent_loc;
+                // let mut closest: Locations = Locations::ShowStage;
+
+                let random_index = rng.gen_range(0..adjacent_rooms.len());
+
+                // Check to see if the animatronic is trying to move to the security office
+                // if it is, check if the door is closed
+                // if it is, don't move there
+                if adjacent_rooms[random_index] == Locations::SecurityOfficeStaticR
+                    && right_door_closed
+                {
+                    return;
+                }
+
+                if adjacent_rooms[random_index] == Locations::SecurityOfficeStaticL
+                    && left_door_closed
+                {
+                    return;
+                }
+
+                self.location = adjacent_rooms[random_index];
             }
 
-            if adjacent_rooms[random_index] == Locations::SecurityOfficeStaticL && left_door_closed
             {
-                return;
+                // set the tell
+                let random_tell = rng.gen_range(0..5);
+                match random_tell {
+                    0 => {
+                        self.current_tell = Tells::Laughing;
+                    }
+                    1 => {
+                        self.current_tell = Tells::Noise;
+                    }
+                    2 => {
+                        self.current_tell = Tells::Footsteps;
+                    }
+                    3 => {
+                        self.current_tell = Tells::Static;
+                    }
+                    4 => {
+                        self.current_tell = Tells::Visual;
+                    }
+                    _ => {
+                        self.current_tell = Tells::Visual;
+                    }
+                }
+
+                if self.name == "Freddy" && self.current_tell == Tells::Noise {
+                    self.current_tell = Tells::Laughing;
+                } else if self.current_tell == Tells::Laughing {
+                    self.current_tell = Tells::Noise;
+                }
+
+                if self.name == "Chica" && self.location == Locations::Kitchen && random_tell > 2 {
+                    self.current_tell = Tells::Static;
+                }
+
+                if self.location == Locations::SecurityOfficeStaticL
+                    || self.location == Locations::SecurityOfficeStaticR
+                {
+                    self.current_tell = Tells::Breathing;
+                }
             }
-
-            self.location = adjacent_rooms[random_index];
-
-            // pathfinding is stupid random numbers are good!
-            // for (i, loc) in locations.enumerate() {
-            //     match loc {
-            //         Some(l) => {
-            //             let dist = map.distance_from_office_attack(&loc.unwrap());
-            //             let closest_dist = map.distance_from_office_attack(&closest);
-            //             if dist < closest_dist {
-            //                 if loc == Some(Locations::SecurityOfficeStaticL) && !map.left_door_closed {
-            //                     closest = loc.unwrap();
-            //                 } else if loc == Some(Locations::SecurityOfficeStaticR) && !map.right_door_closed {
-            //                     closest = loc.unwrap();
-            //                 } else {
-            //                     closest = loc.unwrap();
-            //                 }
-            //             }
-            //         }
-            //         None => {}
-            //     }
-            // }
-
-            // self.location = closest;
         }
     }
 }
@@ -467,132 +494,156 @@ impl Map {
                 Locations::ShowStage => {
                     map = map.replace(
                         "{ss}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::Arcade => {
                     map = map.replace(
                         "{a}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::DiningAreaL => {
                     map = map.replace(
                         "{dal}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::DiningAreaC => {
                     map = map.replace(
                         "{dac}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::DiningAreaR => {
                     map = map.replace(
                         "{dar}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::Kitchen => {
                     map = map.replace(
                         "{k}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::Restrooms => {
                     map = map.replace(
                         "{rr}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::HallwayL => {
                     map = map.replace(
                         "{hl}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::HallwayR => {
                     map = map.replace(
                         "{hr}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::SecurityOfficeStaticL => {
                     map = map.replace(
                         "{sosl}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::SecurityOfficeAttack => {
                     map = map.replace(
                         "{soa}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
                 Locations::SecurityOfficeStaticR => {
                     map = map.replace(
                         "{sosr}",
-                        format!(
-                            "{}{}",
-                            anim.name.chars().next().unwrap(),
-                            anim.current_tell.value()
-                        )
+                        format!("{}", {
+                            if anim.current_tell.value() == "V" {
+                                anim.name.chars().next().unwrap().to_string()
+                            } else {
+                                anim.current_tell.value().to_string()
+                            }
+                        })
                         .as_str(),
                     );
                 }
