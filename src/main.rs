@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use rand::Rng;
 
 use std::cmp;
@@ -115,6 +113,7 @@ struct Animatronic {
     name: String,
     location: Locations,
     difficulty: u8,
+    current_tell: Tells,
 }
 
 impl Animatronic {
@@ -125,16 +124,91 @@ impl Animatronic {
             name,
             location,
             difficulty: clamped,
+            current_tell: Tells::Visual,
         }
     }
 
-    fn move_tick(&mut self, map: &Map) {
+    fn find_adjacent_room(&mut self) -> Vec<Locations> {
+        let mut ret: Vec<Locations> = Vec::new();
+
+        // lol made by a map that i drew up
+        // why do things automatically when you can hard code them!
+
+        /*
+         Map btw
+                                                       [Show Stage]
+           [Arcade]   <===  [Dining Area L]    <===   [Dining Area C]    ===>   [Dining Area R]  ===>  [Kitchen]
+           [Restrooms]----------------------------------[Restrooms]                                   [Hallway R]
+           [Hallway L]                                                                                [Hallway R]
+           [Hallway L] [Security Office Static R] [Security Office Attack] [Security Office Static R] [Hallway R]
+        */
+
+        match self.location {
+            Locations::HallwayL => {
+                ret.push(Locations::Restrooms);
+                ret.push(Locations::SecurityOfficeStaticL);
+            }
+            Locations::HallwayR => {
+                ret.push(Locations::Kitchen);
+                ret.push(Locations::SecurityOfficeStaticR);
+            }
+            Locations::ShowStage => {
+                ret.push(Locations::DiningAreaC);
+            }
+            Locations::DiningAreaL => {
+                ret.push(Locations::Arcade);
+                ret.push(Locations::DiningAreaC);
+            }
+            Locations::DiningAreaC => {
+                ret.push(Locations::DiningAreaL);
+                ret.push(Locations::DiningAreaR);
+                ret.push(Locations::ShowStage);
+                ret.push(Locations::Restrooms);
+            }
+            Locations::DiningAreaR => {
+                ret.push(Locations::DiningAreaC);
+                ret.push(Locations::Kitchen);
+            }
+            Locations::Restrooms => {
+                ret.push(Locations::DiningAreaC);
+                ret.push(Locations::HallwayL);
+                ret.push(Locations::Arcade);
+            }
+            Locations::Kitchen => {
+                ret.push(Locations::DiningAreaR);
+                ret.push(Locations::HallwayR);
+            }
+            Locations::Arcade => {
+                ret.push(Locations::Restrooms);
+                ret.push(Locations::DiningAreaL);
+                ret.push(Locations::HallwayL);
+            }
+            Locations::SecurityOfficeStaticR => {
+                ret.push(Locations::SecurityOfficeAttack);
+            }
+            Locations::SecurityOfficeStaticL => {
+                ret.push(Locations::SecurityOfficeAttack);
+            }
+            Locations::SecurityOfficeAttack => {
+                ret.push(self.location);
+            }
+        }
+
+        ret
+    }
+
+    fn move_tick(
+        &mut self,
+        adjacent_loc: Vec<Locations>,
+        right_door_closed: bool,
+        left_door_closed: bool,
+    ) {
         // move the animatronic
         let mut rng = rand::thread_rng();
         let random_index = rng.gen_range(0..20);
 
         if random_index <= self.difficulty {
-            let adjacent_rooms = map.find_adjacent_room(self.location);
+            let adjacent_rooms = adjacent_loc;
             // let mut closest: Locations = Locations::ShowStage;
 
             let random_index = rng.gen_range(0..adjacent_rooms.len());
@@ -142,14 +216,12 @@ impl Animatronic {
             // Check to see if the animatronic is trying to move to the security office
             // if it is, check if the door is closed
             // if it is, don't move there
-            if adjacent_rooms[random_index] == Locations::SecurityOfficeStaticR
-                && map.right_door_closed
+            if adjacent_rooms[random_index] == Locations::SecurityOfficeStaticR && right_door_closed
             {
                 return;
             }
 
-            if adjacent_rooms[random_index] == Locations::SecurityOfficeStaticL
-                && map.left_door_closed
+            if adjacent_rooms[random_index] == Locations::SecurityOfficeStaticL && left_door_closed
             {
                 return;
             }
@@ -185,6 +257,9 @@ struct Map {
     grid: [[Option<Locations>; 9]; 5],
     left_door_closed: bool,
     right_door_closed: bool,
+    anim_states: Vec<Animatronic>,
+    is_dead: bool,
+    killer: String,
 }
 
 impl Map {
@@ -249,10 +324,25 @@ impl Map {
             ],
             left_door_closed: false,
             right_door_closed: false,
+            anim_states: Vec::new(),
+            is_dead: false,
+            killer: String::from("MissingNo."),
         }
     }
 
-    fn find_adjacent_room(&self, location: Locations) -> Vec<Locations> {
+    fn map_tick(&mut self) {
+        for (_i, anim) in self.anim_states.iter_mut().enumerate() {
+            let locations = anim.find_adjacent_room();
+            anim.move_tick(locations, self.right_door_closed, self.left_door_closed);
+
+            if anim.location == Locations::SecurityOfficeAttack {
+                self.is_dead = true;
+                self.killer = anim.name.clone();
+            }
+        }
+    }
+
+    fn find_adjacent_room(&mut self, location: Locations) -> Vec<Locations> {
         let mut ret: Vec<Locations> = Vec::new();
 
         // lol made by a map that i drew up
@@ -347,8 +437,8 @@ impl Map {
         distance.sqrt() as u8
     }
 
-    fn display_map(&self, states: &HashMap<Locations, (u8, Tells)>) {
-        let map: String = String::from(
+    fn display_map(&self) {
+        let mut map: String = String::from(
             "
         [{ss}]
         | |
@@ -372,125 +462,155 @@ impl Map {
 
          */
 
-        let ss_value = match states.get(&Locations::ShowStage) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
+        for (_i, anim) in self.anim_states.iter().enumerate() {
+            match &anim.location {
+                Locations::ShowStage => {
+                    map = map.replace(
+                        "{ss}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::Arcade => {
+                    map = map.replace(
+                        "{a}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::DiningAreaL => {
+                    map = map.replace(
+                        "{dal}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::DiningAreaC => {
+                    map = map.replace(
+                        "{dac}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::DiningAreaR => {
+                    map = map.replace(
+                        "{dar}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::Kitchen => {
+                    map = map.replace(
+                        "{k}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::Restrooms => {
+                    map = map.replace(
+                        "{rr}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::HallwayL => {
+                    map = map.replace(
+                        "{hl}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::HallwayR => {
+                    map = map.replace(
+                        "{hr}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::SecurityOfficeStaticL => {
+                    map = map.replace(
+                        "{sosl}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::SecurityOfficeAttack => {
+                    map = map.replace(
+                        "{soa}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+                Locations::SecurityOfficeStaticR => {
+                    map = map.replace(
+                        "{sosr}",
+                        format!(
+                            "{}{}",
+                            anim.name.chars().next().unwrap(),
+                            anim.current_tell.value()
+                        )
+                        .as_str(),
+                    );
+                }
+            }
+        }
 
-        let map = map.replace("{ss}", &ss_value);
-
-        let a_value = match states.get(&Locations::Arcade) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{a}", &a_value);
-
-        let dal_value = match states.get(&Locations::DiningAreaL) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{dal}", &dal_value);
-
-        let dac_value = match states.get(&Locations::DiningAreaC) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{dac}", &dac_value);
-
-        let dar_value = match states.get(&Locations::DiningAreaR) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{dar}", &dar_value);
-
-        let k_value = match states.get(&Locations::Kitchen) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{k}", &k_value);
-
-        let rr_value = match states.get(&Locations::Restrooms) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{rr}", &rr_value);
-
-        let hl_value = match states.get(&Locations::HallwayL) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{hl}", &hl_value);
-
-        let hr_value = match states.get(&Locations::HallwayR) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{hr}", &hr_value);
-
-        let sosl_value = match states.get(&Locations::SecurityOfficeStaticL) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{sosl}", &sosl_value);
-
-        let soa_value = match states.get(&Locations::SecurityOfficeAttack) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{soa}", &soa_value);
-
-        let sosr_value = match states.get(&Locations::SecurityOfficeStaticR) {
-            Some((0, t)) => format!("{}F", t.value()),
-            Some((1, t)) => format!("{}B", t.value()),
-            Some((2, t)) => format!("{}C", t.value()),
-            Some((_, t)) => t.value().to_string(),
-            None => String::from(" "),
-        };
-
-        let map = map.replace("{sosr}", &sosr_value);
+        map = map.replace("{ss}", " ");
+        map = map.replace("{a}", " ");
+        map = map.replace("{dal}", " ");
+        map = map.replace("{dac}", " ");
+        map = map.replace("{dar}", " ");
+        map = map.replace("{k}", " ");
+        map = map.replace("{rr}", " ");
+        map = map.replace("{hl}", " ");
+        map = map.replace("{hr}", " ");
+        map = map.replace("{sosl}", " ");
+        map = map.replace("{soa}", " ");
+        map = map.replace("{sosr}", " ");
 
         println!("{map}");
     }
@@ -500,10 +620,6 @@ fn main() {
     const START_TIME: u32 = 0;
     const END_TIME: u32 = 6 * 60;
     const TICK_RATE: u32 = 15; // 15 minutes at a time
-
-    const FREDDY: u8 = 0;
-    const BONNIE: u8 = 1;
-    const CHICA: u8 = 2;
 
     let mut time: u32 = START_TIME;
 
@@ -519,17 +635,9 @@ fn main() {
     animatronics.push(bonnie);
     animatronics.push(chica);
 
-    let mut states: HashMap<Locations, (u8, Tells)> = HashMap::new();
+    let mut map = Map::new();
 
-    states.insert(Locations::ShowStage, (FREDDY, Tells::Visual));
-    states.insert(Locations::ShowStage, (BONNIE, Tells::Visual));
-    states.insert(Locations::ShowStage, (CHICA, Tells::Visual));
-
-    let map = Map::new();
-
-    let mut death: bool = false;
-
-    let mut killer: String = String::from("MissingNo.");
+    map.anim_states = animatronics;
 
     loop {
         let (hours, minutes) = display_time(time);
@@ -540,34 +648,17 @@ fn main() {
 
         battery.update_power();
 
-        for (_i, anim) in animatronics.iter_mut().enumerate() {
-            let curr_loc: Locations = anim.location;
+        map.map_tick();
 
-            anim.move_tick(&map);
-
-            let new_loc: Locations = anim.location;
-
-            if curr_loc != new_loc {
-                if let Some(state) = states.remove(&curr_loc) {
-                    states.insert(new_loc, (state.0, Tells::Visual));
-                }
-            }
-
-            if new_loc == Locations::SecurityOfficeAttack {
-                death = true;
-                killer = anim.name.clone();
-            }
-        }
-
-        map.display_map(&states);
+        map.display_map();
 
         if battery.power == 0 {
             println!("You ran out of power! Game over!");
             break;
         }
 
-        if death {
-            println!("You were attacked by {name}! Game over!", name = killer);
+        if map.is_dead {
+            println!("You were attacked by {name}! Game over!", name = map.killer);
             break;
         }
 
