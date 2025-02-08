@@ -1,10 +1,8 @@
-use std::{collections::HashMap, panic::Location};
+use std::collections::HashMap;
 
 use rand::Rng;
 
 use std::cmp;
-
-
 
 #[derive(PartialEq, Hash, Clone, Copy, Eq)]
 enum Locations {
@@ -100,7 +98,7 @@ impl Battery {
 
     fn update_power(&mut self) {
         let mut rng = rand::thread_rng();
-        for (i, &draw) in self.power_draw.iter().enumerate() {
+        for (_i, &draw) in self.power_draw.iter().enumerate() {
             let random_tick: u8 = rng.gen_range(1..10);
             if draw as u8 <= random_tick {
                 if self.power > 0 {
@@ -122,7 +120,7 @@ struct Animatronic {
 impl Animatronic {
     fn new(name: String, location: Locations, difficulty: u8) -> Animatronic {
         let clamped = cmp::min::<u8>(difficulty, 20);
-        
+
         Animatronic {
             name,
             location,
@@ -134,12 +132,28 @@ impl Animatronic {
         // move the animatronic
         let mut rng = rand::thread_rng();
         let random_index = rng.gen_range(0..20);
-        
+
         if random_index <= self.difficulty {
             let adjacent_rooms = map.find_adjacent_room(self.location);
-            let mut closest: Locations = Locations::ShowStage;
+            // let mut closest: Locations = Locations::ShowStage;
 
-            let mut random_index = rng.gen_range(0..adjacent_rooms.len());
+            let random_index = rng.gen_range(0..adjacent_rooms.len());
+
+            // Check to see if the animatronic is trying to move to the security office
+            // if it is, check if the door is closed
+            // if it is, don't move there
+            if adjacent_rooms[random_index] == Locations::SecurityOfficeStaticR
+                && map.right_door_closed
+            {
+                return;
+            }
+
+            if adjacent_rooms[random_index] == Locations::SecurityOfficeStaticL
+                && map.left_door_closed
+            {
+                return;
+            }
+
             self.location = adjacent_rooms[random_index];
 
             // pathfinding is stupid random numbers are good!
@@ -177,11 +191,61 @@ impl Map {
     fn new() -> Map {
         Map {
             grid: [
-                [None, None, None, Some(Locations::ShowStage), Some(Locations::ShowStage), Some(Locations::ShowStage), None, None, None],
-                [None, None, Some(Locations::Arcade), Some(Locations::DiningAreaL), Some(Locations::DiningAreaC), Some(Locations::DiningAreaR), Some(Locations::Kitchen), None, None],
-                [None, None, Some(Locations::Restrooms), Some(Locations::Restrooms), Some(Locations::Restrooms), Some(Locations::Restrooms), Some(Locations::HallwayR), None, None],
-                [None, None, Some(Locations::HallwayL), None, None, None, Some(Locations::HallwayR), None, None],
-                [None, None, Some(Locations::HallwayL), Some(Locations::SecurityOfficeStaticR), Some(Locations::SecurityOfficeAttack), Some(Locations::SecurityOfficeStaticR), Some(Locations::HallwayR), None, None],
+                [
+                    None,
+                    None,
+                    None,
+                    Some(Locations::ShowStage),
+                    Some(Locations::ShowStage),
+                    Some(Locations::ShowStage),
+                    None,
+                    None,
+                    None,
+                ],
+                [
+                    None,
+                    None,
+                    Some(Locations::Arcade),
+                    Some(Locations::DiningAreaL),
+                    Some(Locations::DiningAreaC),
+                    Some(Locations::DiningAreaR),
+                    Some(Locations::Kitchen),
+                    None,
+                    None,
+                ],
+                [
+                    None,
+                    None,
+                    Some(Locations::Restrooms),
+                    Some(Locations::Restrooms),
+                    Some(Locations::Restrooms),
+                    Some(Locations::Restrooms),
+                    Some(Locations::HallwayR),
+                    None,
+                    None,
+                ],
+                [
+                    None,
+                    None,
+                    Some(Locations::HallwayL),
+                    None,
+                    None,
+                    None,
+                    Some(Locations::HallwayR),
+                    None,
+                    None,
+                ],
+                [
+                    None,
+                    None,
+                    Some(Locations::HallwayL),
+                    Some(Locations::SecurityOfficeStaticR),
+                    Some(Locations::SecurityOfficeAttack),
+                    Some(Locations::SecurityOfficeStaticR),
+                    Some(Locations::HallwayR),
+                    None,
+                    None,
+                ],
             ],
             left_door_closed: false,
             right_door_closed: false,
@@ -195,63 +259,63 @@ impl Map {
         // why do things automatically when you can hard code them!
 
         /*
-          Map btw
-                                                        [Show Stage]
-            [Arcade]   <===  [Dining Area L]    <===   [Dining Area C]    ===>   [Dining Area R]  ===>  [Kitchen]
-            [Restrooms]----------------------------------[Restrooms]                                   [Hallway R] 
-            [Hallway L]                                                                                [Hallway R]
-            [Hallway L] [Security Office Static R] [Security Office Attack] [Security Office Static R] [Hallway R]
-         */
+         Map btw
+                                                       [Show Stage]
+           [Arcade]   <===  [Dining Area L]    <===   [Dining Area C]    ===>   [Dining Area R]  ===>  [Kitchen]
+           [Restrooms]----------------------------------[Restrooms]                                   [Hallway R]
+           [Hallway L]                                                                                [Hallway R]
+           [Hallway L] [Security Office Static R] [Security Office Attack] [Security Office Static R] [Hallway R]
+        */
 
         match location {
             Locations::HallwayL => {
                 ret.push(Locations::Restrooms);
                 ret.push(Locations::SecurityOfficeStaticL);
-            },
+            }
             Locations::HallwayR => {
                 ret.push(Locations::Kitchen);
                 ret.push(Locations::SecurityOfficeStaticR);
-            },
+            }
             Locations::ShowStage => {
                 ret.push(Locations::DiningAreaC);
-            },
+            }
             Locations::DiningAreaL => {
                 ret.push(Locations::Arcade);
                 ret.push(Locations::DiningAreaC);
-            },
+            }
             Locations::DiningAreaC => {
                 ret.push(Locations::DiningAreaL);
                 ret.push(Locations::DiningAreaR);
                 ret.push(Locations::ShowStage);
                 ret.push(Locations::Restrooms);
-            },
+            }
             Locations::DiningAreaR => {
                 ret.push(Locations::DiningAreaC);
                 ret.push(Locations::Kitchen);
-            },
+            }
             Locations::Restrooms => {
                 ret.push(Locations::DiningAreaC);
                 ret.push(Locations::HallwayL);
                 ret.push(Locations::Arcade);
-            },
+            }
             Locations::Kitchen => {
                 ret.push(Locations::DiningAreaR);
                 ret.push(Locations::HallwayR);
-            },
+            }
             Locations::Arcade => {
                 ret.push(Locations::Restrooms);
                 ret.push(Locations::DiningAreaL);
                 ret.push(Locations::HallwayL);
-            },
-            Locations::SecurityOfficeStaticR => { 
-                ret.push(Locations::SecurityOfficeAttack); 
-            },
-            Locations::SecurityOfficeStaticL => { 
-                ret.push(Locations::SecurityOfficeAttack); 
-            },
-            Locations::SecurityOfficeAttack => { 
-                ret.push(location); 
-            },
+            }
+            Locations::SecurityOfficeStaticR => {
+                ret.push(Locations::SecurityOfficeAttack);
+            }
+            Locations::SecurityOfficeStaticL => {
+                ret.push(Locations::SecurityOfficeAttack);
+            }
+            Locations::SecurityOfficeAttack => {
+                ret.push(location);
+            }
         }
 
         ret
@@ -278,12 +342,14 @@ impl Map {
         let (x1, y1) = self.find_location(office_attack);
         let (x2, y2) = self.find_location(location);
 
-        let distance = ((x1 as f64 - x2 as f64).powf(2.0) + (y1 as f64 - y2 as f64).powf(2.0)) as f64;
+        let distance =
+            ((x1 as f64 - x2 as f64).powf(2.0) + (y1 as f64 - y2 as f64).powf(2.0)) as f64;
         distance.sqrt() as u8
     }
 
     fn display_map(&self, states: &HashMap<Locations, (u8, Tells)>) {
-        let mut map: String = String::from("
+        let map: String = String::from(
+            "
         [{ss}]
         | |
 [{a}]==[{dal}--{dac}--{dar}]==[{k}]
@@ -291,7 +357,8 @@ impl Map {
 [{rr}-------{rr}]     | |
 | |             | |
 [{hl}]==[{sosl}--{soa}--{sosr}]==[{hr}]
-");
+",
+        );
 
         /*
                       [{ss}]
@@ -302,114 +369,141 @@ impl Map {
               | |             | |
               [{hl}]==[{sosl}--{soa}--{sosr}]==[{hr}]
         "
-        
+
          */
 
-        let mut map = map.replace(
-            "{ss}",
-            match states.get(&Locations::ShowStage) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let ss_value = match states.get(&Locations::ShowStage) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
 
-        let mut map = map.replace(
-            "{a}",
-            match states.get(&Locations::Arcade) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let map = map.replace("{ss}", &ss_value);
 
-        let mut map = map.replace(
-            "{dal}",
-            match states.get(&Locations::DiningAreaL) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let a_value = match states.get(&Locations::Arcade) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
 
-        let mut map = map.replace(
-            "{dac}",
-            match states.get(&Locations::DiningAreaC) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let map = map.replace("{a}", &a_value);
 
-        let mut map = map.replace(
-            "{dar}",
-            match states.get(&Locations::DiningAreaR) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let dal_value = match states.get(&Locations::DiningAreaL) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
 
-        let mut map = map.replace(
-            "{k}",
-            match states.get(&Locations::Kitchen) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let map = map.replace("{dal}", &dal_value);
 
-        let mut map = map.replace(
-            "{rr}",
-            match states.get(&Locations::Restrooms) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let dac_value = match states.get(&Locations::DiningAreaC) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
 
-        let mut map = map.replace(
-            "{hl}",
-            match states.get(&Locations::HallwayL) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let map = map.replace("{dac}", &dac_value);
 
-        let mut map = map.replace(
-            "{hr}",
-            match states.get(&Locations::HallwayR) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let dar_value = match states.get(&Locations::DiningAreaR) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
 
-        let mut map = map.replace(
-            "{sosl}",
-            match states.get(&Locations::SecurityOfficeStaticL) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let map = map.replace("{dar}", &dar_value);
 
-        let mut map = map.replace(
-            "{soa}",
-            match states.get(&Locations::SecurityOfficeAttack) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
+        let k_value = match states.get(&Locations::Kitchen) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
 
-        let map = map.replace(
-            "{sosr}",
-            match states.get(&Locations::SecurityOfficeStaticR) {
-                Some((_, t)) => t.value(),
-                None => " ",
-            },
-        );
-        
+        let map = map.replace("{k}", &k_value);
+
+        let rr_value = match states.get(&Locations::Restrooms) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
+
+        let map = map.replace("{rr}", &rr_value);
+
+        let hl_value = match states.get(&Locations::HallwayL) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
+
+        let map = map.replace("{hl}", &hl_value);
+
+        let hr_value = match states.get(&Locations::HallwayR) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
+
+        let map = map.replace("{hr}", &hr_value);
+
+        let sosl_value = match states.get(&Locations::SecurityOfficeStaticL) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
+
+        let map = map.replace("{sosl}", &sosl_value);
+
+        let soa_value = match states.get(&Locations::SecurityOfficeAttack) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
+
+        let map = map.replace("{soa}", &soa_value);
+
+        let sosr_value = match states.get(&Locations::SecurityOfficeStaticR) {
+            Some((0, t)) => format!("{}F", t.value()),
+            Some((1, t)) => format!("{}B", t.value()),
+            Some((2, t)) => format!("{}C", t.value()),
+            Some((_, t)) => t.value().to_string(),
+            None => String::from(" "),
+        };
+
+        let map = map.replace("{sosr}", &sosr_value);
+
         println!("{map}");
     }
-
 }
 
 fn main() {
     const START_TIME: u32 = 0;
     const END_TIME: u32 = 6 * 60;
     const TICK_RATE: u32 = 15; // 15 minutes at a time
+
+    const FREDDY: u8 = 0;
+    const BONNIE: u8 = 1;
+    const CHICA: u8 = 2;
 
     let mut time: u32 = START_TIME;
 
@@ -427,24 +521,28 @@ fn main() {
 
     let mut states: HashMap<Locations, (u8, Tells)> = HashMap::new();
 
-    states.insert(Locations::ShowStage, (0, Tells::Visual));
-    states.insert(Locations::ShowStage, (1, Tells::Visual));
-    states.insert(Locations::ShowStage, (2, Tells::Visual));
-
+    states.insert(Locations::ShowStage, (FREDDY, Tells::Visual));
+    states.insert(Locations::ShowStage, (BONNIE, Tells::Visual));
+    states.insert(Locations::ShowStage, (CHICA, Tells::Visual));
 
     let map = Map::new();
 
     let mut death: bool = false;
 
+    let mut killer: String = String::from("MissingNo.");
+
     loop {
         let (hours, minutes) = display_time(time);
-        println!("Time: {:02}:{:02}\nBattery: {}%", hours, minutes, battery.power);
+        println!(
+            "Time: {:02}:{:02}\nBattery: {}%",
+            hours, minutes, battery.power
+        );
 
         battery.update_power();
 
-        for (i, anim) in animatronics.iter_mut().enumerate() {
+        for (_i, anim) in animatronics.iter_mut().enumerate() {
             let curr_loc: Locations = anim.location;
-            
+
             anim.move_tick(&map);
 
             let new_loc: Locations = anim.location;
@@ -457,6 +555,7 @@ fn main() {
 
             if new_loc == Locations::SecurityOfficeAttack {
                 death = true;
+                killer = anim.name.clone();
             }
         }
 
@@ -468,7 +567,7 @@ fn main() {
         }
 
         if death {
-            println!("You were attacked by an animatronic! Game over!");
+            println!("You were attacked by {name}! Game over!", name = killer);
             break;
         }
 
