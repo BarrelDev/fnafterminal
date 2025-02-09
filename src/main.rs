@@ -31,12 +31,12 @@ enum Tells {
 impl Tells {
     fn value(&self) -> &str {
         match self {
-            Tells::Laughing => "L",
-            Tells::Noise => "N",
-            Tells::Footsteps => "F",
-            Tells::Static => "S",
-            Tells::Visual => "V",
-            Tells::Breathing => "B",
+            Tells::Laughing => "l",
+            Tells::Noise => "n",
+            Tells::Footsteps => "f",
+            Tells::Static => "s",
+            Tells::Visual => "v",
+            Tells::Breathing => "b",
         }
     }
 }
@@ -49,7 +49,7 @@ enum PowerDraw {
 }
 
 impl PowerDraw {
-    fn value(&self) -> u8 {
+    fn value(&self) -> i8 {
         match self {
             PowerDraw::Camera => 2,
             PowerDraw::Lights => 4,
@@ -60,12 +60,12 @@ impl PowerDraw {
 
 impl PartialEq for PowerDraw {
     fn eq(&self, other: &Self) -> bool {
-        *self as u8 == *other as u8
+        *self as i8 == *other as i8
     }
 }
 
 struct Battery {
-    power: u8,
+    power: i8,
     power_draw: Vec<PowerDraw>,
 }
 
@@ -100,8 +100,8 @@ impl Battery {
     fn update_power(&mut self) {
         let mut rng = rand::thread_rng();
         for (_i, &draw) in self.power_draw.iter().enumerate() {
-            let random_tick: u8 = rng.gen_range(1..10);
-            if draw as u8 <= random_tick {
+            let random_tick: u8 = rng.gen_range(1..20);
+            if draw as u8 * 2 <= random_tick {
                 if self.power > 0 {
                     self.power -= draw.value();
                 } else {
@@ -206,6 +206,14 @@ impl Animatronic {
         right_door_closed: bool,
         left_door_closed: bool,
     ) {
+        if right_door_closed && self.location == Locations::SecurityOfficeStaticR {
+            self.location = Locations::HallwayR;
+        }
+
+        if left_door_closed && self.location == Locations::SecurityOfficeStaticL {
+            self.location = Locations::HallwayL;
+        }
+
         // move the animatronic
         let mut rng = rand::thread_rng();
         let random_index = rng.gen_range(0..20);
@@ -284,6 +292,8 @@ struct Map {
     grid: [[Option<Locations>; 9]; 5],
     left_door_closed: bool,
     right_door_closed: bool,
+    left_light_on: bool,
+    right_light_on: bool,
     anim_states: Vec<Animatronic>,
     is_dead: bool,
     killer: String,
@@ -351,6 +361,8 @@ impl Map {
             ],
             left_door_closed: false,
             right_door_closed: false,
+            left_light_on: false,
+            right_light_on: false,
             anim_states: Vec::new(),
             is_dead: false,
             killer: String::from("MissingNo."),
@@ -365,6 +377,14 @@ impl Map {
             if anim.location == Locations::SecurityOfficeAttack {
                 self.is_dead = true;
                 self.killer = anim.name.clone();
+            }
+
+            if anim.location == Locations::HallwayL && self.left_light_on {
+                println!("You see {} is at the left door!", anim.name);
+            }
+
+            if anim.location == Locations::HallwayR && self.right_light_on {
+                println!("You see {} is at the right door!", anim.name);
             }
         }
     }
@@ -495,7 +515,7 @@ impl Map {
                     map = map.replace(
                         "{ss}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -508,7 +528,7 @@ impl Map {
                     map = map.replace(
                         "{a}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -521,7 +541,7 @@ impl Map {
                     map = map.replace(
                         "{dal}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -534,7 +554,7 @@ impl Map {
                     map = map.replace(
                         "{dac}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -547,7 +567,7 @@ impl Map {
                     map = map.replace(
                         "{dar}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -560,7 +580,7 @@ impl Map {
                     map = map.replace(
                         "{k}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -573,7 +593,7 @@ impl Map {
                     map = map.replace(
                         "{rr}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -586,7 +606,7 @@ impl Map {
                     map = map.replace(
                         "{hl}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -599,7 +619,7 @@ impl Map {
                     map = map.replace(
                         "{hr}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -612,7 +632,7 @@ impl Map {
                     map = map.replace(
                         "{sosl}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -624,21 +644,14 @@ impl Map {
                 Locations::SecurityOfficeAttack => {
                     map = map.replace(
                         "{soa}",
-                        format!("{}", {
-                            if anim.current_tell.value() == "V" {
-                                anim.name.chars().next().unwrap().to_string()
-                            } else {
-                                anim.current_tell.value().to_string()
-                            }
-                        })
-                        .as_str(),
+                        format!("{}", { anim.name.chars().next().unwrap().to_string() }).as_str(),
                     );
                 }
                 Locations::SecurityOfficeStaticR => {
                     map = map.replace(
                         "{sosr}",
                         format!("{}", {
-                            if anim.current_tell.value() == "V" {
+                            if anim.current_tell.value() == "v" {
                                 anim.name.chars().next().unwrap().to_string()
                             } else {
                                 anim.current_tell.value().to_string()
@@ -688,20 +701,85 @@ fn main() {
 
     let mut map = Map::new();
 
+    let mut turn_input: String = String::new();
+
     map.anim_states = animatronics;
 
     loop {
         let (hours, minutes) = display_time(time);
+
+        turn_input.clear();
+
         println!(
             "Time: {:02}:{:02}\nBattery: {}%",
             hours, minutes, battery.power
         );
 
+        println!("Office State: \n\tLeft Door: {}\n\tRight Door: {}\n\tLeft Light: {}\n\tRight Light: {}",
+                 if map.left_door_closed { "Closed" } else { "Open" },
+                 if map.right_door_closed { "Closed" } else { "Open" },
+                 if map.left_light_on { "On" } else { "Off" },
+                 if map.right_light_on { "On" } else { "Off" });
+
+        loop {
+            println!("What is your move this turn? : ");
+
+            let _ = std::io::stdin().read_line(&mut turn_input).unwrap();
+
+            match turn_input.trim() {
+                "left door" => {
+                    map.left_door_closed = !map.left_door_closed;
+                    if map.left_door_closed {
+                        battery.add_power_draw(PowerDraw::Doors);
+                    } else {
+                        battery.remove_power_draw(PowerDraw::Doors);
+                    }
+                    break;
+                }
+                "left light" => {
+                    map.left_light_on = !map.left_light_on;
+                    if map.left_light_on {
+                        battery.add_power_draw(PowerDraw::Lights);
+                    } else {
+                        battery.remove_power_draw(PowerDraw::Lights);
+                    }
+                    break;
+                }
+                "right door" => {
+                    map.right_door_closed = !map.right_door_closed;
+                    if map.right_door_closed {
+                        battery.add_power_draw(PowerDraw::Doors);
+                    } else {
+                        battery.remove_power_draw(PowerDraw::Doors);
+                    }
+                    break;
+                }
+                "right light" => {
+                    map.right_light_on = !map.right_light_on;
+                    if map.right_light_on {
+                        battery.add_power_draw(PowerDraw::Lights);
+                    } else {
+                        battery.remove_power_draw(PowerDraw::Lights);
+                    }
+                    break;
+                }
+                "camera" => {
+                    battery.add_power_draw(PowerDraw::Camera);
+                    map.display_map();
+                    break;
+                }
+                "sit" => {
+                    break;
+                }
+                _ => {
+                    println!("Invalid command!");
+                    turn_input.clear();
+                }
+            }
+        }
+
         battery.update_power();
-
-        map.map_tick();
-
-        map.display_map();
+        battery.remove_power_draw(PowerDraw::Camera);
 
         if battery.power == 0 {
             println!("You ran out of power! Game over!");
@@ -719,9 +797,10 @@ fn main() {
         }
 
         time += TICK_RATE;
+
+        map.map_tick();
     }
 
-    println!("Hello, world!");
 }
 
 fn display_time(time: u32) -> (u32, u32) {
