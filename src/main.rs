@@ -791,12 +791,12 @@ fn main() {
             break;
         }
 
+        time += TICK_RATE;
+
         if time >= END_TIME {
             println!("You survived the night! Congratulations!");
             break;
         }
-
-        time += TICK_RATE;
 
         map.map_tick();
     }
